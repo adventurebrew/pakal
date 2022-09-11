@@ -52,9 +52,12 @@ def read_file(stream: IO[bytes], offset: int, size: int) -> IO[bytes]:
 
 
 class ArchivePath:
-    def __init__(self, fname, entry, archive) -> None:
+    def __init__(
+        self,
+        fname: str,
+        archive: 'BaseArchive[EntryType]',
+    ) -> None:
         self.name = os.path.normpath(fname)
-        self.entry = entry
         self.archive = archive
 
     @property
@@ -67,20 +70,25 @@ class ArchivePath:
     def match(self, pattern: str):
         return pathlib.Path(self.name).match(pattern)
 
-    @contextmanager
+    def glob(self, pattern: str) -> Iterator['ArchivePath']:
+        return (
+            entry
+            for entry in self.archive
+            if entry.match(os.path.join(self.name, pattern))
+        )
+
     def open(
         self,
         mode: str = 'r',
         encoding: str = 'utf-8',
         errors: Optional[str] = None,
-    ) -> Iterator[IO[AnyStr]]:
-        with self.archive.open(
+    ) -> ContextManager[IO[AnyStr]]:
+        return self.archive.open(
             self.name,
             mode=mode,
             encoding=encoding,
             errors=errors,
-        ) as f:
-            yield f
+        )
 
     def read_bytes(self):
         with self.open(mode='rb') as f:
@@ -155,8 +163,8 @@ class BaseArchive(AbstractContextManager, Generic[EntryType]):
         return self.close()
 
     def __iter__(self) -> Iterator[ArchivePath]:
-        for fname, entry in self.index.items():
-            yield ArchivePath(fname, entry, self)
+        for fname, _ in self.index.items():
+            yield ArchivePath(fname, self)
 
     def glob(self, pattern: str) -> Iterator[ArchivePath]:
         return (entry for entry in self if entry.match(pattern))
