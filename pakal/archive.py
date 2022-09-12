@@ -54,27 +54,34 @@ def read_file(stream: IO[bytes], offset: int, size: int) -> IO[bytes]:
 class ArchivePath:
     def __init__(
         self,
-        fname: str,
+        fname: Union[str, os.PathLike[str]],
         archive: 'BaseArchive[EntryType]',
     ) -> None:
-        self.name = os.path.normpath(fname)
+        self.fname = os.path.normpath(fname)
         self.archive = archive
 
     @property
-    def parent(self):
-        return pathlib.Path(self.name).parent
+    def parent(self) -> 'ArchivePath':
+        return ArchivePath(pathlib.Path(self.fname).parent, self.archive)
+
+    @property
+    def name(self) -> str:
+        return str(pathlib.Path(self.fname).name)
 
     def __str__(self):
-        return str(self.name)
+        return str(self.fname)
 
     def match(self, pattern: str):
-        return pathlib.Path(self.name).match(pattern)
+        return pathlib.Path(self.fname).match(pattern)
+
+    def exists(self) -> bool:
+        return any(self.archive.glob(str(self)))
 
     def glob(self, pattern: str) -> Iterator['ArchivePath']:
         return (
             entry
             for entry in self.archive
-            if entry.match(os.path.join(self.name, pattern))
+            if entry.match(os.path.join(self.fname, pattern))
         )
 
     def open(
@@ -84,7 +91,7 @@ class ArchivePath:
         errors: Optional[str] = None,
     ) -> ContextManager[IO[AnyStr]]:
         return self.archive.open(
-            self.name,
+            self.fname,
             mode=mode,
             encoding=encoding,
             errors=errors,
@@ -101,6 +108,12 @@ class ArchivePath:
             errors=errors,
         ) as f:
             return f.read()
+
+    def __truediv__(self, key: Union[str, os.PathLike[str]]) -> 'ArchivePath':
+        return ArchivePath(str(pathlib.Path(self.fname) / key), self.archive)
+
+    def __rtruediv__(self, key: Union[str, os.PathLike[str]]) -> 'ArchivePath':
+        return ArchivePath(str(key / pathlib.Path(self.fname)), self.archive)
 
 
 class BaseArchive(AbstractContextManager, Generic[EntryType]):
@@ -169,12 +182,16 @@ class BaseArchive(AbstractContextManager, Generic[EntryType]):
     def glob(self, pattern: str) -> Iterator[ArchivePath]:
         return (entry for entry in self if entry.match(pattern))
 
-    def extractall(self, dirname: str, pattern: str = GLOB_ALL) -> None:
-        for entry in self:
-            if entry.match(pattern):
-                os.makedirs(os.path.join(dirname, entry.parent), exist_ok=True)
-                with io.open(os.path.join(dirname, entry.name), 'wb') as out_file:
-                    out_file.write(entry.read_bytes())
+    def extractall(
+        self,
+        dirname: Union[str, os.PathLike[str]],
+        pattern: str = GLOB_ALL,
+    ) -> None:
+        dirname = pathlib.Path(dirname)
+        for entry in self.glob(pattern):
+            os.makedirs(str(dirname / entry.parent), exist_ok=True)
+            with io.open(str(dirname / entry.fname), 'wb') as out_file:
+                out_file.write(entry.read_bytes())
 
 
 class SimpleArchive(BaseArchive[SimpleEntry]):
