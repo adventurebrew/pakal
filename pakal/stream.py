@@ -9,6 +9,9 @@ class PartialStreamView:
     def __init__(self, stream: Stream, size: int) -> None:
         self._stream = stream
         self._start = stream.tell()
+        if isinstance(self._stream, PartialStreamView):
+            self._start += self._stream._start
+            self._stream = self._stream._stream
         self._size = size
         self._pos = 0
 
