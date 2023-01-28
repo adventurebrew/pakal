@@ -14,6 +14,7 @@ from typing import (
     Mapping,
     NamedTuple,
     Optional,
+    Protocol,
     Tuple,
     Type,
     TypeVar,
@@ -39,6 +40,15 @@ def create_directory(name: AnyStr) -> None:
 class _SimpleEntry(NamedTuple):
     offset: int
     size: int
+
+
+class Opener(Protocol):
+    def open(
+        file: os.PathLike,
+        mode: str,
+        **kwars,
+    ) -> IO[Any]:
+        """Custom namespace that provides `open` function."""
 
 
 SimpleEntry = Union[_SimpleEntry, Tuple[int, int]]
@@ -121,6 +131,9 @@ class BaseArchive(AbstractContextManager, Generic[EntryType]):
 
     index: Mapping[str, EntryType]
 
+    _filename: Optional[pathlib.Path] = None
+    _io: Opener = io
+
     def _create_index(self) -> ArchiveIndex[EntryType]:
         raise NotImplementedError('create_index')
 
@@ -128,14 +141,22 @@ class BaseArchive(AbstractContextManager, Generic[EntryType]):
     def _read_entry(self, entry: EntryType) -> Iterator[IO[bytes]]:
         raise NotImplementedError('read_entry')
 
-    def __init__(self, file: Union[AnyStr, os.PathLike[AnyStr], IO[bytes]]) -> None:
+    def __init__(
+        self,
+        file: Union[AnyStr, os.PathLike[AnyStr], IO[bytes]],
+        opener: Opener = io,
+    ) -> None:
         if isinstance(file, os.PathLike):
             file = os.fspath(file)
 
+        self._io = opener
+
         if isinstance(file, (str, bytes)):
-            self._stream = io.open(file, 'rb')
+            self._stream = self._io.open(file, 'rb')
+            self._filename = pathlib.Path(file)
         else:
             self._stream = file
+            self._filename = None
         self.index = {
             os.path.normpath(name): entry
             for name, entry in self._create_index().items()
