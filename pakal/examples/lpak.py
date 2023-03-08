@@ -1,10 +1,12 @@
-from contextlib import contextmanager
 import io
+from contextlib import contextmanager
 from struct import Struct
 from typing import (
+    IO,
+    TYPE_CHECKING,
     Any,
     Dict,
-    IO,
+    Iterable,
     Iterator,
     List,
     NamedTuple,
@@ -12,12 +14,18 @@ from typing import (
     cast,
 )
 
-from pakal.archive import ArchiveIndex, BaseArchive, make_opener, read_file
+from pakal.archive import BaseArchive, make_opener, read_file
 from pakal.stream import PartialStreamView
+
+if TYPE_CHECKING:
+    from pakal.archive import ArchiveIndex
 
 UINT32LE = Struct('<I')
 UINT32LE_X4 = Struct('<4I')
 FLOAT32LE = Struct('<f')
+
+VERSION_1_0 = 1.0
+VERSION_1_5 = 1.5
 
 FILE_ENTRY_1_0 = Struct('<5I')
 FILE_ENTRY_1_5 = Struct('<Q4I')
@@ -32,18 +40,24 @@ class LPAKFileEntry(NamedTuple):
 
 
 def read_uint32le_x4(stream: IO[bytes]) -> Tuple[int, int, int, int]:
-    return UINT32LE_X4.unpack(stream.read(UINT32LE_X4.size))  # type: ignore
+    return cast(
+        Tuple[int, int, int, int],
+        UINT32LE_X4.unpack(stream.read(UINT32LE_X4.size)),
+    )
 
 
 def read_float(stream: IO[bytes]) -> float:
-    return FLOAT32LE.unpack(stream.read(FLOAT32LE.size))[0]
+    return cast(float, FLOAT32LE.unpack(stream.read(FLOAT32LE.size))[0])
 
 
 def read_iter(structure: Struct, stream: IO[bytes]) -> Iterator[Tuple[Any, ...]]:
     return structure.iter_unpack(stream.read())
 
 
-def get_partial_streams(stream: IO[bytes], cues) -> Iterator[Tuple[int, IO[bytes]]]:
+def get_partial_streams(
+    stream: IO[bytes],
+    cues: Iterable[Tuple[int, int]],
+) -> Iterator[Tuple[int, IO[bytes]]]:
     pos = stream.tell()
     for offset, size in cues:
         stream.seek(offset, io.SEEK_SET)
@@ -66,17 +80,22 @@ def read_header(
     tag = stream.read(4)
     assert tag == b'LPAK'[::-1]
     version = read_float(stream)
-    if version >= 1.5:
-        assert version == 1.5, version
+    if version >= VERSION_1_5:
+        assert version == VERSION_1_5, version
         offs = list(read_uint32le_x4(stream))
         sizes = list(read_uint32le_x4(stream))
         resizes = sizes[1], sizes[0], sizes[2], size - offs[0]
         cues = list(zip(offs, resizes))
         views = list(get_partial_streams(stream, cues))
         return tag, version, views
-    assert version == 1.0, version
+    assert version == VERSION_1_0, version
     cues = list(
-        zip(*[read_uint32le_x4(stream), read_uint32le_x4(stream)])  # type: ignore
+        zip(
+            *[
+                read_uint32le_x4(stream),
+                read_uint32le_x4(stream),
+            ],
+        ),  # type: ignore[arg-type]
     )
     views = list(get_partial_streams(stream, cues))
     return tag, version, views
@@ -116,10 +135,10 @@ def get_findex_v15(
 
 
 class LPakArchive(BaseArchive[LPAKFileEntry]):
-    def _create_index(self) -> ArchiveIndex[LPAKFileEntry]:
+    def _create_index(self) -> 'ArchiveIndex[LPAKFileEntry]':
         tag, version, views = read_header(self._stream)
         self.version = version
-        read_findex = get_findex if version < 1.5 else get_findex_v15
+        read_findex = get_findex if version < VERSION_1_5 else get_findex_v15
         index, data = read_findex(self._stream, views)
         self.data_off = data
         return index

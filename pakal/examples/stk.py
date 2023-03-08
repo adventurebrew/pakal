@@ -1,10 +1,13 @@
 import io
 from contextlib import contextmanager
-from typing import IO, Iterator, NamedTuple, cast
+from typing import IO, TYPE_CHECKING, AnyStr, Iterator, NamedTuple, Tuple, cast
 
-from pakal.archive import ArchiveIndex, BaseArchive, make_opener
-from pakal.stream import PartialStreamView
+from pakal.archive import BaseArchive, make_opener
 from pakal.examples.common import read_uint16_le, read_uint32_le
+from pakal.stream import PartialStreamView
+
+if TYPE_CHECKING:
+    from pakal.archive import ArchiveIndex
 
 
 class STKFileEntry(NamedTuple):
@@ -13,15 +16,15 @@ class STKFileEntry(NamedTuple):
     compression: int
 
 
-def replace_many(s, *reps):
+def replace_many(s: AnyStr, *reps: Tuple[AnyStr, AnyStr]) -> AnyStr:
     for r in reps:
         s = s.replace(*r)
     return s
 
 
-def extract(stream: IO[bytes]):
+def extract(stream: IO[bytes]) -> Iterator[Tuple[str, STKFileEntry]]:
     file_count = read_uint16_le(stream)
-    for i in range(file_count):
+    for _i in range(file_count):
         raw_fname = stream.read(13)
         file_name = raw_fname.split(b'\0')[0].decode()
         size = read_uint32_le(stream)
@@ -35,7 +38,7 @@ def extract(stream: IO[bytes]):
         yield file_name, STKFileEntry(offset, size, compression)
 
 
-def unpack_chunk(stream: IO[bytes], size: int):
+def unpack_chunk(stream: IO[bytes], size: int) -> bytes:
     tmp_ind = 4078
     tmp_buf = bytearray(b'\x20' * tmp_ind + b'\0' * 36)
     res = b''
@@ -83,7 +86,7 @@ def unpack(stream: IO[bytes], offset: int, size: int, compression: int) -> IO[by
 
 
 class STKArchive(BaseArchive[STKFileEntry]):
-    def _create_index(self) -> ArchiveIndex[STKFileEntry]:
+    def _create_index(self) -> 'ArchiveIndex[STKFileEntry]':
         return dict(extract(self._stream))
 
     @contextmanager

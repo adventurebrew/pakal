@@ -1,12 +1,15 @@
 import io
 import os
-from typing import IO
+from typing import IO, TYPE_CHECKING
 
-from pakal.archive import ArchiveIndex, SimpleArchive, SimpleEntry, make_opener
+from pakal.archive import SimpleArchive, make_opener
 from pakal.examples.common import read_uint32_le
 
+if TYPE_CHECKING:
+    from pakal.archive import ArchiveIndex, SimpleEntry
 
-def read_index_entries(stream: IO[bytes]) -> ArchiveIndex[SimpleEntry]:
+
+def read_index_entries(stream: IO[bytes]) -> 'ArchiveIndex[SimpleEntry]':
     _unk = stream.read(3)
     size = read_uint32_le(stream)
     subs = stream.read(size).split(b'\r\n')[:-1]
@@ -22,7 +25,7 @@ def read_index_entries(stream: IO[bytes]) -> ArchiveIndex[SimpleEntry]:
 
 
 class WestwoodInstaller(SimpleArchive):
-    def _create_index(self) -> ArchiveIndex[SimpleEntry]:
+    def _create_index(self) -> 'ArchiveIndex[SimpleEntry]':
         return read_index_entries(self._stream)
 
 

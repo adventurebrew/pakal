@@ -2,9 +2,9 @@ import io
 import os
 import pathlib
 from contextlib import AbstractContextManager, contextmanager
-from types import TracebackType
 from typing import (
     IO,
+    TYPE_CHECKING,
     Any,
     AnyStr,
     Callable,
@@ -22,19 +22,16 @@ from typing import (
     cast,
 )
 
-from pakal.stream import PartialStreamView
+if TYPE_CHECKING:
+    from types import TracebackType
 
+from pakal.stream import PartialStreamView
 
 GLOB_ALL = '*'
 
 
-ArchiveType = TypeVar('ArchiveType', bound='BaseArchive')
 EntryType = TypeVar('EntryType')
 ArchiveIndex = Mapping[str, EntryType]
-
-
-def create_directory(name: AnyStr) -> None:
-    os.makedirs(name, exist_ok=True)
 
 
 class _SimpleEntry(NamedTuple):
@@ -44,10 +41,11 @@ class _SimpleEntry(NamedTuple):
 
 class Opener(Protocol):
     def open(
-        file: os.PathLike,
+        self,
+        file: Union[str, bytes, os.PathLike[AnyStr]],
         mode: str,
-        **kwars,
-    ) -> IO[Any]:
+        **kwars: Any,
+    ) -> IO[AnyStr]:
         """Custom namespace that provides `open` function."""
 
 
@@ -56,9 +54,15 @@ SimpleEntry = Union[_SimpleEntry, Tuple[int, int]]
 
 def read_file(stream: IO[bytes], offset: int, size: int) -> IO[bytes]:
     stream.seek(
-        offset, io.SEEK_SET
+        offset,
+        io.SEEK_SET,
     )  # need unit test to check offset is always equal to f.tell()
     return cast(IO[bytes], PartialStreamView(stream, size))
+
+
+class MemberNotFoundError(ValueError):
+    def __init__(self, fname: str) -> None:
+        super().__init__(f'no member {fname} found in archive')
 
 
 class ArchivePath:
@@ -67,31 +71,29 @@ class ArchivePath:
         fname: Union[str, os.PathLike[str]],
         archive: 'BaseArchive[EntryType]',
     ) -> None:
-        self.fname = os.path.normpath(fname)
+        self.fname = pathlib.Path(os.path.normpath(fname))
         self.archive = archive
 
     @property
     def parent(self) -> 'ArchivePath':
-        return ArchivePath(pathlib.Path(self.fname).parent, self.archive)
+        return ArchivePath(self.fname.parent, self.archive)
 
     @property
     def name(self) -> str:
-        return str(pathlib.Path(self.fname).name)
+        return str(self.fname.name)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self.fname)
 
-    def match(self, pattern: str):
-        return pathlib.Path(self.fname).match(pattern)
+    def match(self, pattern: str) -> bool:
+        return self.fname.match(pattern)
 
     def exists(self) -> bool:
         return any(self.archive.glob(str(self)))
 
     def glob(self, pattern: str) -> Iterator['ArchivePath']:
         return (
-            entry
-            for entry in self.archive
-            if entry.match(os.path.join(self.fname, pattern))
+            entry for entry in self.archive if entry.match(str(self.fname / pattern))
         )
 
     def open(
@@ -107,11 +109,15 @@ class ArchivePath:
             errors=errors,
         )
 
-    def read_bytes(self):
+    def read_bytes(self) -> bytes:
         with self.open(mode='rb') as f:
-            return f.read()
+            return cast(bytes, f.read())
 
-    def read_text(self, encoding=None, errors=None):
+    def read_text(
+        self,
+        encoding: str = 'utf-8',
+        errors: Optional[str] = None,
+    ) -> str:
         with self.open(
             mode='r',
             encoding=encoding,
@@ -126,13 +132,13 @@ class ArchivePath:
         return ArchivePath(str(key / pathlib.Path(self.fname)), self.archive)
 
 
-class BaseArchive(AbstractContextManager, Generic[EntryType]):
+class BaseArchive(AbstractContextManager['BaseArchive[EntryType]'], Generic[EntryType]):
     _stream: IO[bytes]
 
     index: Mapping[str, EntryType]
 
     _filename: Optional[pathlib.Path] = None
-    _io: Opener = io
+    _io: Opener = io  # type: ignore[assignment]
 
     def _create_index(self) -> ArchiveIndex[EntryType]:
         raise NotImplementedError('create_index')
@@ -144,7 +150,7 @@ class BaseArchive(AbstractContextManager, Generic[EntryType]):
     def __init__(
         self,
         file: Union[AnyStr, os.PathLike[AnyStr], IO[bytes]],
-        opener: Opener = io,
+        opener: Opener = io,  # type: ignore[assignment]
     ) -> None:
         if isinstance(file, os.PathLike):
             file = os.fspath(file)
@@ -153,7 +159,7 @@ class BaseArchive(AbstractContextManager, Generic[EntryType]):
 
         if isinstance(file, (str, bytes)):
             self._stream = self._io.open(file, 'rb')
-            self._filename = pathlib.Path(file)
+            self._filename = pathlib.Path(file)  # type: ignore[arg-type]
         else:
             self._stream = file
             self._filename = None
@@ -165,25 +171,26 @@ class BaseArchive(AbstractContextManager, Generic[EntryType]):
     @contextmanager
     def open(
         self,
-        fname: str,
+        fname: Union[str, os.PathLike[str]],
         mode: str = 'r',
         encoding: str = 'utf-8',
         errors: Optional[str] = None,
     ) -> Iterator[IO[AnyStr]]:
         try:
             member = self.index[os.path.normpath(fname)]
-        except KeyError:
-            raise ValueError(f'no member {fname} found in archive')
+        except KeyError as exc:
+            raise MemberNotFoundError(str(fname)) from exc
 
-        stream: IO
+        ostream: IO  # type: ignore[type-arg]
         with self._read_entry(member) as stream:
+            ostream = stream
             if 'b' not in mode:
-                stream = io.TextIOWrapper(
-                    cast(IO[bytes], stream),
+                ostream = io.TextIOWrapper(
+                    cast(IO[bytes], ostream),  # type: ignore[redundant-cast]
                     encoding=encoding,
                     errors=errors,
                 )
-            yield stream
+            yield ostream
 
     def close(self) -> Optional[bool]:
         return self._stream.close()
@@ -192,7 +199,7 @@ class BaseArchive(AbstractContextManager, Generic[EntryType]):
         self,
         exc_type: Optional[Type[BaseException]],
         exc_value: Optional[BaseException],
-        traceback: Optional[TracebackType],
+        traceback: Optional['TracebackType'],
     ) -> Optional[bool]:
         return self.close()
 
@@ -223,10 +230,10 @@ class SimpleArchive(BaseArchive[SimpleEntry]):
 
 
 def make_opener(
-    archive_type: Type[ArchiveType],
-) -> Callable[..., ContextManager[ArchiveType]]:
+    archive_type: Type['BaseArchive[EntryType]'],
+) -> Callable[..., ContextManager['BaseArchive[EntryType]']]:
     @contextmanager
-    def opener(*args: Any, **kwargs: Any) -> Iterator[ArchiveType]:
+    def opener(*args: Any, **kwargs: Any) -> Iterator['BaseArchive[EntryType]']:
         with archive_type(*args, **kwargs) as inst:
             yield inst
 
@@ -239,7 +246,11 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument(
-        '-m', '--module', required=True, type=str, help='Archive module'
+        '-m',
+        '--module',
+        required=True,
+        type=str,
+        help='Archive module',
     )
     parser.add_argument('filename', type=str, help='File to extract from')
     parser.add_argument(
@@ -252,14 +263,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    open_archive = getattr(import_module(args.module), 'open')
+    open_archive = import_module(args.module).open
 
-    print(args.filename, args.pattern)
     with open_archive(args.filename) as arc:
-
         if args.pattern == GLOB_ALL:
-            assert set(str(x) for x in arc.glob(args.pattern)) == set(
-                fname for fname in arc.index
-            )
+            assert {str(x) for x in arc.glob(args.pattern)} == set(arc.index)
 
         arc.extractall('out', args.pattern)

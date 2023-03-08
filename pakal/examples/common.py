@@ -22,18 +22,24 @@ def readcstr(stream: IO[bytes]) -> bytes:
 
 def bound_readcstr(stream: IO[bytes]) -> bytes:
     return b''.join(
-        takewhile(partial(operator.ne, b'\00'), iter(partial(stream.read, 1), b''))
+        takewhile(partial(operator.ne, b'\00'), iter(partial(stream.read, 1), b'')),
     )
+
+
+class ReachedEOFBeforeNullTerminationError(EOFError):
+    def __init__(self) -> None:
+        super().__init__('Expected null-termination but reached EOF')
 
 
 def safe_readcstr(stream: IO[bytes]) -> bytes:
     try:
         bound_read = cast(
-            Iterable[bytes], chain(iter(partial(stream.read, 1), b''), [None])
+            Iterable[bytes],
+            chain(iter(partial(stream.read, 1), b''), [None]),
         )
-        return b''.join(takewhile(partial(operator.ne, b'\00'), bound_read))
-    except TypeError:
-        raise EOFError('Expected null-termination but reached EOF')
+    except TypeError as exc:
+        raise ReachedEOFBeforeNullTerminationError from exc
+    return b''.join(takewhile(partial(operator.ne, b'\00'), bound_read))
 
 
 def write_uint16_be(number: int) -> bytes:

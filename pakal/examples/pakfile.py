@@ -1,10 +1,12 @@
-from itertools import takewhile
 from functools import partial
+from itertools import takewhile
+from typing import IO, TYPE_CHECKING, Any, Iterable, Sequence, Tuple
 
-from typing import Any, IO, Iterable, Sequence, Tuple
+from pakal.archive import SimpleArchive, make_opener
+from pakal.examples.common import read_uint32_le, readcstr
 
-from pakal.archive import ArchiveIndex, SimpleArchive, SimpleEntry, make_opener
-from pakal.examples.common import readcstr, read_uint32_le
+if TYPE_CHECKING:
+    from pakal.archive import ArchiveIndex, SimpleEntry
 
 
 def read_index_entry(stream: IO[bytes]) -> Tuple[str, int]:
@@ -20,19 +22,19 @@ def read_index_entries(stream: IO[bytes]) -> Tuple[Sequence[str], Sequence[int]]
     index_entries = iter(partial(read_index_entry, stream), ('', 0))
     index_entries = takewhile(partial(before_offset, stream, off), index_entries)
     names, offs = zip(*index_entries)
-    return names, (off,) + tuple(offs)
+    return names, (off, *tuple(offs))
 
 
 def create_index_mapping(
     names: Iterable[str],
     offsets: Sequence[int],
-) -> ArchiveIndex[SimpleEntry]:
+) -> 'ArchiveIndex[SimpleEntry]':
     sizes = [(end - start) for start, end in zip(offsets, offsets[1:])]
     return dict(zip(names, zip(offsets, sizes)))
 
 
 class PakFile(SimpleArchive):
-    def _create_index(self) -> ArchiveIndex[SimpleEntry]:
+    def _create_index(self) -> 'ArchiveIndex[SimpleEntry]':
         return create_index_mapping(*read_index_entries(self._stream))
 
 
