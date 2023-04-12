@@ -76,22 +76,58 @@ class ArchivePath:
 
     @property
     def parent(self) -> 'ArchivePath':
+        """The logical parent of the path."""
         return ArchivePath(self.fname.parent, self.archive)
 
     @property
     def name(self) -> str:
+        """The final path component, if any."""
         return str(self.fname.name)
 
+    @property
+    def suffix(self) -> str:
+        """
+        The final component's last suffix, if any.
+
+        This includes the leading period. For example: '.txt'
+        """
+        return str(self.fname.suffix)
+
+    @property
+    def stem(self) -> str:
+        """The final path component, minus its last suffix."""
+        return str(self.fname.stem)
+
+    def with_name(self, name: str) -> 'ArchivePath':
+        """Return a new path with the file name changed."""
+        return ArchivePath(self.fname.with_name(name), self.archive)
+
+    def with_stem(self, stem: str) -> 'ArchivePath':
+        """Return a new path with the stem changed."""
+        return ArchivePath(self.fname.with_stem(stem), self.archive)
+
+    def with_suffix(self, suffix: str) -> 'ArchivePath':
+        """Return a new path with the file suffix changed."""
+        return ArchivePath(self.fname.with_suffix(suffix), self.archive)
+
     def __str__(self) -> str:
+        """Return the string representation of the path."""
         return str(self.fname)
 
     def match(self, pattern: str) -> bool:
+        """
+        Return True if this path matches the given pattern.
+        """
         return self.fname.match(pattern)
 
     def exists(self) -> bool:
+        """Returns True if this path exists within the archive."""
         return any(self.archive.glob(str(self)))
 
     def glob(self, pattern: str) -> Iterator['ArchivePath']:
+        """Iterate over this subtree and yield all existing files (of any
+        kind, including directories) matching the given relative pattern.
+        """
         return (
             entry for entry in self.archive if entry.match(str(self.fname / pattern))
         )
@@ -102,6 +138,10 @@ class ArchivePath:
         encoding: str = 'utf-8',
         errors: Optional[str] = None,
     ) -> ContextManager[IO[AnyStr]]:
+        """
+        Open the file pointed by this path and return a file object, as
+        the built-in open() function does.
+        """
         return self.archive.open(
             self.fname,
             mode=mode,
@@ -110,20 +150,26 @@ class ArchivePath:
         )
 
     def read_bytes(self) -> bytes:
-        with self.open(mode='rb') as f:
-            return cast(bytes, f.read())
+        """
+        Open the file in bytes mode, read it, and close the file.
+        """
+        with self.open(mode='rb') as stream:
+            return cast(bytes, stream.read())
 
     def read_text(
         self,
         encoding: str = 'utf-8',
         errors: Optional[str] = None,
     ) -> str:
+        """
+        Open the file in text mode, read it, and close the file.
+        """
         with self.open(
             mode='r',
             encoding=encoding,
             errors=errors,
-        ) as f:
-            return f.read()
+        ) as stream:
+            return stream.read()
 
     def __truediv__(self, key: Union[str, os.PathLike[str]]) -> 'ArchivePath':
         return ArchivePath(str(pathlib.Path(self.fname) / key), self.archive)
@@ -263,7 +309,9 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    open_archive = import_module(args.module).open
+    open_archive: Callable[..., ContextManager[BaseArchive[Any]]] = import_module(
+        args.module,
+    ).open
 
     with open_archive(args.filename) as arc:
         if args.pattern == GLOB_ALL:
