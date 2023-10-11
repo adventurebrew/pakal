@@ -8,10 +8,11 @@ authors = ["BLooperZ <blooperz@users.noreply.github.com>"]
 python = "^3.9"
 
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.0.254"
-black = "^23.1.0"
-pytest = "^7.2.2"
-mypy = "^1.1.1"
+ruff = "^0.0.292"
+black = "^23.9.1"
+pytest = "^7.4.2"
+mypy = "^1.6.0"
+pre-commit = "^3.4.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -19,14 +20,14 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]  # https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html#configuration-via-a-file
 line-length = 88
-target-version = ["py38"]
+target-version = ["py39"]
 skip-string-normalization = true
 
 [tool.mypy]
 strict = true
 
 [tool.ruff]
-target-version = "py38"
+target-version = "py39"
 line-length = 88
 fix = false
 src = ["pakal", "tests"]

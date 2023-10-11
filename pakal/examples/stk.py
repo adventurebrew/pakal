@@ -1,6 +1,7 @@
 import io
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import IO, TYPE_CHECKING, AnyStr, Iterator, NamedTuple, Tuple, cast
+from typing import IO, TYPE_CHECKING, AnyStr, NamedTuple, cast
 
 from pakal.archive import BaseArchive, make_opener
 from pakal.examples.common import read_uint16_le, read_uint32_le
@@ -16,13 +17,13 @@ class STKFileEntry(NamedTuple):
     compression: int
 
 
-def replace_many(s: AnyStr, *reps: Tuple[AnyStr, AnyStr]) -> AnyStr:
+def replace_many(s: AnyStr, *reps: tuple[AnyStr, AnyStr]) -> AnyStr:
     for r in reps:
         s = s.replace(*r)
     return s
 
 
-def extract(stream: IO[bytes]) -> Iterator[Tuple[str, STKFileEntry]]:
+def extract(stream: IO[bytes]) -> Iterator[tuple[str, STKFileEntry]]:
     file_count = read_uint16_le(stream)
     for _i in range(file_count):
         raw_fname = stream.read(13)

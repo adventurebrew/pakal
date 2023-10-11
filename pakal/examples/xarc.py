@@ -1,5 +1,6 @@
 import pathlib
-from typing import IO, TYPE_CHECKING, Iterator, Tuple
+from collections.abc import Iterator
+from typing import IO, TYPE_CHECKING
 
 from pakal.archive import (
     GLOB_ALL,
@@ -12,7 +13,7 @@ if TYPE_CHECKING:
     from pakal.archive import ArchiveIndex, SimpleEntry
 
 
-def read_index_entries(stream: IO[bytes]) -> Iterator[Tuple[str, 'SimpleEntry']]:
+def read_index_entries(stream: IO[bytes]) -> Iterator[tuple[str, 'SimpleEntry']]:
     _unknown = read_uint32_le(stream)
     file_count = read_uint32_le(stream)
     base_offset = read_uint32_le(stream)

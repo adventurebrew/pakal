@@ -1,7 +1,8 @@
 import operator
+from collections.abc import Iterable
 from functools import partial
 from itertools import chain, takewhile
-from typing import IO, Iterable, cast
+from typing import IO, cast
 
 
 def read_uint16_le(stream: IO[bytes]) -> int:

@@ -1,29 +1,22 @@
 import io
 import os
 import pathlib
+import types
+from collections.abc import Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from typing import (
     IO,
-    TYPE_CHECKING,
     Any,
     AnyStr,
     Callable,
-    ContextManager,
     Generic,
-    Iterator,
-    Mapping,
     NamedTuple,
     Optional,
     Protocol,
-    Tuple,
-    Type,
     TypeVar,
     Union,
     cast,
 )
-
-if TYPE_CHECKING:
-    from types import TracebackType
 
 from pakal.stream import PartialStreamView
 
@@ -49,7 +42,7 @@ class Opener(Protocol):
         """Custom namespace that provides `open` function."""
 
 
-SimpleEntry = Union[_SimpleEntry, Tuple[int, int]]
+SimpleEntry = Union[_SimpleEntry, tuple[int, int]]
 
 
 def read_file(stream: IO[bytes], offset: int, size: int) -> IO[bytes]:
@@ -137,7 +130,7 @@ class ArchivePath:
         mode: str = 'r',
         encoding: str = 'utf-8',
         errors: Optional[str] = None,
-    ) -> ContextManager[IO[AnyStr]]:
+    ) -> AbstractContextManager[IO[AnyStr]]:
         """
         Open the file pointed by this path and return a file object, as
         the built-in open() function does.
@@ -243,9 +236,9 @@ class BaseArchive(AbstractContextManager['BaseArchive[EntryType]'], Generic[Entr
 
     def __exit__(
         self,
-        exc_type: Optional[Type[BaseException]],
+        exc_type: Optional[type[BaseException]],
         exc_value: Optional[BaseException],
-        traceback: Optional['TracebackType'],
+        traceback: Optional[types.TracebackType],
     ) -> Optional[bool]:
         return self.close()
 
@@ -275,15 +268,18 @@ class SimpleArchive(BaseArchive[SimpleEntry]):
         yield read_file(self._stream, entry.offset, entry.size)
 
 
+ArchiveOpener = Callable[..., AbstractContextManager[BaseArchive[EntryType]]]
+
+
 def make_opener(
-    archive_type: Type['BaseArchive[EntryType]'],
-) -> Callable[..., ContextManager['BaseArchive[EntryType]']]:
+    archive_type: type['BaseArchive[EntryType]'],
+) -> 'ArchiveOpener[EntryType]':
     @contextmanager
     def opener(*args: Any, **kwargs: Any) -> Iterator['BaseArchive[EntryType]']:
         with archive_type(*args, **kwargs) as inst:
             yield inst
 
-    return opener
+    return cast(ArchiveOpener[EntryType], opener)
 
 
 if __name__ == '__main__':
@@ -309,9 +305,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    open_archive: Callable[..., ContextManager[BaseArchive[Any]]] = import_module(
-        args.module,
-    ).open
+    open_archive: ArchiveOpener[Any] = import_module(args.module).open
 
     with open_archive(args.filename) as arc:
         if args.pattern == GLOB_ALL:

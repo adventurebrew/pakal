@@ -1,6 +1,7 @@
+from collections.abc import Iterable, Sequence
 from functools import partial
 from itertools import takewhile
-from typing import IO, TYPE_CHECKING, Any, Iterable, Sequence, Tuple
+from typing import IO, TYPE_CHECKING, Any
 
 from pakal.archive import SimpleArchive, make_opener
 from pakal.examples.common import read_uint32_le, readcstr
@@ -9,7 +10,7 @@ if TYPE_CHECKING:
     from pakal.archive import ArchiveIndex, SimpleEntry
 
 
-def read_index_entry(stream: IO[bytes]) -> Tuple[str, int]:
+def read_index_entry(stream: IO[bytes]) -> tuple[str, int]:
     return readcstr(stream).decode(), read_uint32_le(stream)
 
 
@@ -17,7 +18,7 @@ def before_offset(stream: IO[bytes], off: int, *args: Any) -> bool:
     return stream.tell() < off
 
 
-def read_index_entries(stream: IO[bytes]) -> Tuple[Sequence[str], Sequence[int]]:
+def read_index_entries(stream: IO[bytes]) -> tuple[Sequence[str], Sequence[int]]:
     off = read_uint32_le(stream)
     index_entries = iter(partial(read_index_entry, stream), ('', 0))
     index_entries = takewhile(partial(before_offset, stream, off), index_entries)

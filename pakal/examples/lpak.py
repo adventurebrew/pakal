@@ -1,16 +1,12 @@
 import io
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from struct import Struct
 from typing import (
     IO,
     TYPE_CHECKING,
     Any,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
     NamedTuple,
-    Tuple,
     cast,
 )
 
@@ -39,9 +35,9 @@ class LPAKFileEntry(NamedTuple):
     is_compressed: int
 
 
-def read_uint32le_x4(stream: IO[bytes]) -> Tuple[int, int, int, int]:
+def read_uint32le_x4(stream: IO[bytes]) -> tuple[int, int, int, int]:
     return cast(
-        Tuple[int, int, int, int],
+        tuple[int, int, int, int],
         UINT32LE_X4.unpack(stream.read(UINT32LE_X4.size)),
     )
 
@@ -50,14 +46,14 @@ def read_float(stream: IO[bytes]) -> float:
     return cast(float, FLOAT32LE.unpack(stream.read(FLOAT32LE.size))[0])
 
 
-def read_iter(structure: Struct, stream: IO[bytes]) -> Iterator[Tuple[Any, ...]]:
+def read_iter(structure: Struct, stream: IO[bytes]) -> Iterator[tuple[Any, ...]]:
     return structure.iter_unpack(stream.read())
 
 
 def get_partial_streams(
     stream: IO[bytes],
-    cues: Iterable[Tuple[int, int]],
-) -> Iterator[Tuple[int, IO[bytes]]]:
+    cues: Iterable[tuple[int, int]],
+) -> Iterator[tuple[int, IO[bytes]]]:
     pos = stream.tell()
     for offset, size in cues:
         stream.seek(offset, io.SEEK_SET)
@@ -75,7 +71,7 @@ def get_stream_size(stream: IO[bytes]) -> int:
 
 def read_header(
     stream: IO[bytes],
-) -> Tuple[bytes, float, List[Tuple[int, IO[bytes]]]]:
+) -> tuple[bytes, float, list[tuple[int, IO[bytes]]]]:
     size = get_stream_size(stream)
     tag = stream.read(4)
     assert tag == b'LPAK'[::-1]
@@ -103,8 +99,8 @@ def read_header(
 
 def get_findex(
     stream: IO[bytes],
-    views: List[Tuple[int, IO[bytes]]],
-) -> Tuple[Dict[str, LPAKFileEntry], int]:
+    views: list[tuple[int, IO[bytes]]],
+) -> tuple[dict[str, LPAKFileEntry], int]:
     index, ftable, names, data = views
     assert stream.tell() == index[0]
     _ = [val[0] for val in read_iter(UINT32LE, index[1])]
@@ -119,8 +115,8 @@ def get_findex(
 
 def get_findex_v15(
     stream: IO[bytes],
-    views: List[Tuple[int, IO[bytes]]],
-) -> Tuple[Dict[str, LPAKFileEntry], int]:
+    views: list[tuple[int, IO[bytes]]],
+) -> tuple[dict[str, LPAKFileEntry], int]:
     ftable, index, names, data = views
     _ = stream.read(8)
     assert stream.tell() == ftable[0], (stream.tell(), ftable[0])

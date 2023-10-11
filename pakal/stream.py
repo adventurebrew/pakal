@@ -10,8 +10,8 @@ class PartialStreamView(Generic[AnyStr]):
         self._stream: Stream[AnyStr] = stream
         self._start = stream.tell()
         if isinstance(self._stream, PartialStreamView):
-            self._start += self._stream._start  # noqa: private-member-access
-            self._stream = self._stream._stream  # noqa: private-member-access
+            self._start += self._stream._start  # noqa: SLF001
+            self._stream = self._stream._stream  # noqa: SLF001
         self._size = size
         self._pos = 0
 
