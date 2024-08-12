@@ -28,6 +28,21 @@ EntryType = TypeVar('EntryType')
 ArchiveIndex = Mapping[str, EntryType]
 
 
+ArchiveType = TypeVar('ArchiveType', bound='BaseArchive[EntryType]')  # type: ignore[valid-type]
+ArchiveOpener = Callable[..., AbstractContextManager[ArchiveType]]
+
+
+def make_opener(
+    archive_type: type['ArchiveType'],
+) -> 'ArchiveOpener[ArchiveType]':
+    @contextmanager
+    def opener(*args: Any, **kwargs: Any) -> 'Iterator[ArchiveType]':
+        with archive_type(*args, **kwargs) as inst:
+            yield cast('ArchiveType', inst)
+
+    return cast('ArchiveOpener[ArchiveType]', opener)
+
+
 class _SimpleEntry(NamedTuple):
     offset: int
     size: int
@@ -277,20 +292,6 @@ class SimpleArchive(BaseArchive[SimpleEntry]):
     def _read_entry(self, entry: SimpleEntry) -> Iterator[IO[bytes]]:
         entry = _SimpleEntry(*entry)
         yield read_file(self._stream, entry.offset, entry.size)
-
-
-ArchiveOpener = Callable[..., AbstractContextManager[BaseArchive[EntryType]]]
-
-
-def make_opener(
-    archive_type: type['BaseArchive[EntryType]'],
-) -> 'ArchiveOpener[EntryType]':
-    @contextmanager
-    def opener(*args: Any, **kwargs: Any) -> Iterator['BaseArchive[EntryType]']:
-        with archive_type(*args, **kwargs) as inst:
-            yield inst
-
-    return cast(ArchiveOpener[EntryType], opener)
 
 
 if __name__ == '__main__':
