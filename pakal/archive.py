@@ -7,10 +7,10 @@ from collections.abc import Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from typing import (
     IO,
+    TYPE_CHECKING,
     Any,
     AnyStr,
     Callable,
-    Generic,
     NamedTuple,
     Optional,
     Protocol,
@@ -23,13 +23,15 @@ from pakal.stream import PartialStreamView
 
 GLOB_ALL = '*'
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator, Mapping
 
-EntryType = TypeVar('EntryType')
-ArchiveIndex = Mapping[str, EntryType]
+    EntryType = TypeVar('EntryType')
+    ArchiveIndex = Mapping[str, EntryType]
 
 
-ArchiveType = TypeVar('ArchiveType', bound='BaseArchive[EntryType]')  # type: ignore[valid-type]
-ArchiveOpener = Callable[..., AbstractContextManager[ArchiveType]]
+    ArchiveType = TypeVar('ArchiveType', bound='BaseArchive[EntryType]')  # type: ignore[valid-type]
+    ArchiveOpener = Callable[..., AbstractContextManager[ArchiveType]]
 
 
 def make_opener(
@@ -133,7 +135,7 @@ class ArchivePath:
         """Returns True if this path exists within the archive."""
         return any(self.archive.glob(str(self)))
 
-    def glob(self, pattern: str) -> Iterator['ArchivePath']:
+    def glob(self, pattern: str) -> 'Iterator[ArchivePath]':
         """Iterate over this subtree and yield all existing files (of any
         kind, including directories) matching the given relative pattern.
         """
@@ -189,23 +191,23 @@ class ArchivePath:
 
 def buffered(
     source: Callable[[Optional[int]], bytes], buffer_size: int = io.DEFAULT_BUFFER_SIZE,
-) -> Iterator[bytes]:
+) -> 'Iterator[bytes]':
     return iter(functools.partial(source, buffer_size), b'')
 
 
-class BaseArchive(AbstractContextManager['BaseArchive[EntryType]'], Generic[EntryType]):
+class BaseArchive(AbstractContextManager['BaseArchive[EntryType]']):
     _stream: IO[bytes]
 
-    index: Mapping[str, EntryType]
+    index: 'Mapping[str, EntryType]'
 
     _filename: Optional[pathlib.Path] = None
     _io: Opener = io  # type: ignore[assignment]
 
-    def _create_index(self) -> ArchiveIndex[EntryType]:
+    def _create_index(self) -> 'ArchiveIndex[EntryType]':
         raise NotImplementedError('create_index')
 
     @contextmanager
-    def _read_entry(self, entry: EntryType) -> Iterator[IO[bytes]]:
+    def _read_entry(self, entry: 'EntryType') -> 'Iterator[IO[bytes]]':
         raise NotImplementedError('read_entry')
 
     def __init__(
@@ -236,7 +238,7 @@ class BaseArchive(AbstractContextManager['BaseArchive[EntryType]'], Generic[Entr
         mode: str = 'r',
         encoding: str = 'utf-8',
         errors: Optional[str] = None,
-    ) -> Iterator[IO[AnyStr]]:
+    ) -> 'Iterator[IO[AnyStr]]':
         try:
             member = self.index[os.path.normpath(fname)]
         except KeyError as exc:
@@ -264,11 +266,11 @@ class BaseArchive(AbstractContextManager['BaseArchive[EntryType]'], Generic[Entr
     ) -> Optional[bool]:
         return self.close()
 
-    def __iter__(self) -> Iterator[ArchivePath]:
+    def __iter__(self) -> 'Iterator[ArchivePath]':
         for fname, _ in self.index.items():
             yield ArchivePath(fname, self)
 
-    def glob(self, pattern: str) -> Iterator[ArchivePath]:
+    def glob(self, pattern: str) -> 'Iterator[ArchivePath]':
         return (entry for entry in self if entry.match(pattern))
 
     def extractall(
@@ -289,7 +291,7 @@ class BaseArchive(AbstractContextManager['BaseArchive[EntryType]'], Generic[Entr
 
 class SimpleArchive(BaseArchive[SimpleEntry]):
     @contextmanager
-    def _read_entry(self, entry: SimpleEntry) -> Iterator[IO[bytes]]:
+    def _read_entry(self, entry: SimpleEntry) -> 'Iterator[IO[bytes]]':
         entry = _SimpleEntry(*entry)
         yield read_file(self._stream, entry.offset, entry.size)
 
@@ -317,7 +319,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    open_archive: ArchiveOpener[Any] = import_module(args.module).open
+    open_archive: 'ArchiveOpener[Any]' = import_module(args.module).open
+
 
     with open_archive(args.filename) as arc:
         if args.pattern == GLOB_ALL:
