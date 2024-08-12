@@ -1,13 +1,10 @@
 import io
-from typing import IO, AnyStr, Generic, Optional, Union
-
-Stream = Union[IO[AnyStr], 'PartialStreamView']
-AnyStream = Union[Stream[str], Stream[bytes]]
+from typing import IO, Optional
 
 
-class PartialStreamView(Generic[AnyStr]):
-    def __init__(self, stream: Stream[AnyStr], size: int) -> None:
-        self._stream: Stream[AnyStr] = stream
+class PartialStreamView(IO[bytes]):
+    def __init__(self, stream: IO[bytes], size: int) -> None:
+        self._stream: IO[bytes] = stream
         self._start = stream.tell()
         if isinstance(self._stream, PartialStreamView):
             self._start += self._stream._start  # noqa: SLF001
@@ -26,7 +23,7 @@ class PartialStreamView(Generic[AnyStr]):
     def tell(self) -> int:
         return self._pos
 
-    def read(self, size: Optional[int] = None) -> AnyStr:
+    def read(self, size: Optional[int] = None) -> bytes:
         self._stream.seek(self._start + self._pos, io.SEEK_SET)
         if size is not None and size >= 0:
             size = min(self._size - self._pos, size)

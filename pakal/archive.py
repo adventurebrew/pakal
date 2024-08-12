@@ -1,3 +1,4 @@
+import functools
 import io
 import os
 import pathlib
@@ -171,6 +172,12 @@ class ArchivePath:
         return ArchivePath(str(key / pathlib.Path(self.fname)), self.archive)
 
 
+def buffered(
+    source: Callable[[Optional[int]], bytes], buffer_size: int = io.DEFAULT_BUFFER_SIZE,
+) -> Iterator[bytes]:
+    return iter(functools.partial(source, buffer_size), b'')
+
+
 class BaseArchive(AbstractContextManager['BaseArchive[EntryType]'], Generic[EntryType]):
     _stream: IO[bytes]
 
@@ -257,8 +264,12 @@ class BaseArchive(AbstractContextManager['BaseArchive[EntryType]'], Generic[Entr
         dirname = pathlib.Path(dirname)
         for entry in self.glob(pattern):
             os.makedirs(str(dirname / entry.parent), exist_ok=True)
-            with io.open(str(dirname / entry.fname), 'wb') as out_file:
-                out_file.write(entry.read_bytes())
+            with (
+                entry.open('rb') as infile,
+                io.open(str(dirname / entry.fname), 'wb') as outfile,
+            ):
+                for buffer in buffered(infile.read):  # type: ignore[arg-type]
+                    outfile.write(buffer)
 
 
 class SimpleArchive(BaseArchive[SimpleEntry]):
@@ -286,7 +297,7 @@ if __name__ == '__main__':
     import argparse
     from importlib import import_module
 
-    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser = argparse.ArgumentParser(description='Extract files from an archive.')
     parser.add_argument(
         '-m',
         '--module',
