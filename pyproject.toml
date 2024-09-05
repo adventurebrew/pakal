@@ -6,12 +6,14 @@ authors = ["BLooperZ <blooperz@users.noreply.github.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
+numpy = "^1.26.4"
+typing-extensions = "^4.12.2"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.0.292"
 black = "^23.9.1"
 pytest = "^7.4.2"
-mypy = "^1.6.0"
+mypy = "^1.11.1"
 pre-commit = "^3.4.0"
 
 [build-system]
@@ -25,6 +27,7 @@ skip-string-normalization = true
 
 [tool.mypy]
 strict = true
+plugins = ["numpy.typing.mypy_plugin"]
 
 [tool.ruff]
 target-version = "py39"
@@ -92,7 +95,7 @@ ignore = [
   "RET504", # Allow assigning before return to ease debugging
   "S101", # Allow using assert
   "UP020", # Would explicitly prefer using `io.open` rather than builtin because we allow to overshadow it
-  "ANN101", # Do not require annotating self
+  "ANN101", "ANN102", # Do not require annotating self
   "PTH103", # `os.mkdirs` is more readable
   "PTH119", # `os.path.basename()` does not change type (e.g. bytes to str)
   "D107", # No need to docstring `__init__` method
