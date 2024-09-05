@@ -40,8 +40,9 @@ class ResourceStream(io.RawIOBase):
             size = min(self._size - self._pos, size)
         else:
             size = self._size - self._pos
-        end = (self._pos + size) if size is not None else None
-        return self._res.buffer[self._pos:end].tobytes()
+        prev = self._pos
+        self._pos += size
+        return self._res.buffer[prev:self._pos].tobytes()
 
     def readinto(self, b: bytearray) -> int: # type: ignore[override]
         size = min(len(b), self._size - self._pos)
