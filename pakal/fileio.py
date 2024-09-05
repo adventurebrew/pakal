@@ -54,6 +54,9 @@ class ResourceStream(io.RawIOBase):
         self._res.close()
 
     def partial(self, offset: int, size: int) -> IO[bytes]:
+        if size > io.DEFAULT_BUFFER_SIZE:
+            res = ResourceFile(self._res[offset:offset + size])
+            return io.BufferedReader(ResourceStream(res))
         return io.BytesIO(self._res[offset:offset + size]) # type: ignore[arg-type]
 
 
