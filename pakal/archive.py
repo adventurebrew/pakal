@@ -3,7 +3,6 @@ import io
 import os
 import pathlib
 import types
-from collections.abc import Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from typing import (
     IO,
@@ -19,6 +18,7 @@ from typing import (
     cast,
 )
 
+from pakal.fileio import ResourceFile, ResourceStream
 from pakal.stream import PartialStreamView
 
 GLOB_ALL = '*'
@@ -64,6 +64,22 @@ SimpleEntry = Union[_SimpleEntry, tuple[int, int]]
 
 
 def read_file(stream: IO[bytes], offset: int, size: int) -> IO[bytes]:
+    """
+    Read a portion of a file from the given offset with the specified size.
+
+    """
+
+    if isinstance(stream, io.BufferedReader):
+        stream = cast(IO[bytes], stream.raw)
+
+    if isinstance(stream, io.BytesIO):
+        substream = stream.getbuffer()[offset : offset + size]
+        assert len(substream) == size, (len(substream), size)
+        return io.BytesIO(substream)
+
+    if isinstance(stream, ResourceStream):
+        return stream.partial(offset, size)
+
     stream.seek(
         offset,
         io.SEEK_SET,
@@ -201,7 +217,7 @@ class BaseArchive(AbstractContextManager['BaseArchive[EntryType]']):
     index: 'Mapping[str, EntryType]'
 
     _filename: Optional[pathlib.Path] = None
-    _io: Opener = io  # type: ignore[assignment]
+    _io: Opener = ResourceFile  # type: ignore[assignment]
 
     def _create_index(self) -> 'ArchiveIndex[EntryType]':
         raise NotImplementedError('create_index')
@@ -213,7 +229,7 @@ class BaseArchive(AbstractContextManager['BaseArchive[EntryType]']):
     def __init__(
         self,
         file: Union[AnyStr, os.PathLike[AnyStr], IO[bytes]],
-        opener: Opener = io,  # type: ignore[assignment]
+        opener: Opener = ResourceFile,  # type: ignore[assignment]
     ) -> None:
         if isinstance(file, os.PathLike):
             file = os.fspath(file)

@@ -2,7 +2,7 @@ import io
 from typing import IO, Optional
 
 
-class PartialStreamView(IO[bytes]):
+class PartialStreamView(io.RawIOBase):
     def __init__(self, stream: IO[bytes], size: int) -> None:
         self._stream: IO[bytes] = stream
         self._start = stream.tell()
