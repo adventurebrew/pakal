@@ -7,7 +7,6 @@ authors = ["BLooperZ <blooperz@users.noreply.github.com>"]
 [tool.poetry.dependencies]
 python = "^3.9"
 numpy = "^2.0.1"
-typing-extensions = "^4.12.2"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.0.292"
