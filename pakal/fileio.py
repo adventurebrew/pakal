@@ -101,9 +101,6 @@ class ResourceFile(AbstractContextManager[memoryview]):
     ) -> 'ResourceFile':
         data = np.memmap(file_path, dtype='u1', mode='r')
 
-        if key == 0x00:
-            return cls(data)
-
         tmp = tempfile.TemporaryFile()
         result = np.memmap(tmp, dtype='u1', mode='w+', shape=data.shape)
         result[:] = data ^ key
