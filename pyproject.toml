@@ -102,6 +102,9 @@ ignore = [
   "D", # TODO: Add docstrings
 ]
 
+[tool.ruff.format]
+quote-style = "single"
+
 [tool.ruff.pycodestyle]
 max-doc-length = 88
 
