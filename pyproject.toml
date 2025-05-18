@@ -5,31 +5,25 @@ description = ""
 authors = ["BLooperZ <blooperz@users.noreply.github.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.9"
-numpy = "^2.0.1"
+python = ">=3.12"
+numpy = "^2.2.6"
 
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.0.292"
-black = "^23.9.1"
-pytest = "^7.4.2"
-mypy = "^1.11.1"
-pre-commit = "^3.4.0"
+ruff = "^0.11.10"
+pytest = "^8.3.5"
+mypy = "^1.15.0"
+pre-commit = "^4.2.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.black]  # https://black.readthedocs.io/en/stable/usage_and_configuration/the_basics.html#configuration-via-a-file
-line-length = 88
-target-version = ["py39"]
-skip-string-normalization = true
 
 [tool.mypy]
 strict = true
 plugins = ["numpy.typing.mypy_plugin"]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py312"
 line-length = 88
 fix = false
 src = ["pakal", "tests"]
